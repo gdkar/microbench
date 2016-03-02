@@ -1,5 +1,6 @@
 #include "systemtime.h"
 
+#include <memory>
 #include <cstdint>
 #include <cassert>
 #include <utility>
@@ -11,9 +12,9 @@ namespace moodycamel
 {
 	struct stats_t
 	{
-		stats_t(double* results, std::size_t count)
+		stats_t(const std::unique_ptr<double[]> &results, std::size_t count)
 		{
-			std::sort(results, results + count);
+			std::sort(&results[0], &results[count]);
 			
 			_min = results[0];
 			_max = results[count - 1];
@@ -91,8 +92,7 @@ namespace moodycamel
 	{
 		assert(testRuns >= 1);
 		assert(iterations >= 1);
-
-		auto results = new double[testRuns];
+        auto results = std::make_unique<double[]>(testRuns);
 		for (std::uint32_t i = 0; i < testRuns; ++i) {
 			auto start = getSystemTime();
 			for (std::uint64_t j = 0; j < iterations; ++j) {
@@ -103,17 +103,7 @@ namespace moodycamel
 				results[i] /= iterations;
 			}
 		}
-		
-		double fastest = results[0];
-		for (std::uint32_t i = 1; i < testRuns; ++i) {
-			if (results[i] < fastest) {
-				fastest = results[i];
-			}
-		}
-		
-		stats_t stats(results, testRuns);
-		delete[] results;
-		return stats;
+		return stats_t(results,testRuns);
 	}
 	
 	
@@ -123,7 +113,9 @@ namespace moodycamel
 	template<typename TFunc>
 	double microbench(TFunc&& func, std::uint64_t iterations = 1, std::uint32_t testRuns = 100, bool returnTimePerIteration = true)
 	{
-		return microbench_stats(std::forward<TFunc>(func), iterations, testRuns, returnTimePerIteration).min();
+        auto nstats = microbench_stats([]() { },iterations,testRuns,returnTimePerIteration);
+		auto stats  = microbench_stats(std::forward<TFunc>(func), iterations, testRuns, returnTimePerIteration);
+        return stats.min() - nstats.min();
 	}
 }
 

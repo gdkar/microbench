@@ -17,12 +17,10 @@
 
 namespace moodycamel
 {
-
 void sleep(int milliseconds)
 {
 	::Sleep(milliseconds);
 }
-
 SystemTime getSystemTime()
 {
 	LARGE_INTEGER t;
@@ -96,40 +94,21 @@ double getTimeDelta(SystemTime start)
 }  // end namespace moodycamel
 
 #elif defined(ST_NIX)
-
 #include <unistd.h>
-
 namespace moodycamel
 {
-
 void sleep(int milliseconds)
 {
 	::usleep(milliseconds * 1000);
 }
-
 SystemTime getSystemTime()
 {
-	timespec t;
-	CompilerMemBar();
-	if (clock_gettime(CLOCK_MONOTONIC_RAW, &t) != 0) {
-		t.tv_sec = (time_t)-1;
-		t.tv_nsec = -1;
-	}
-	CompilerMemBar();
-	
-	return t;
+    uint32_t ignored;
+    return __rdtscp(&ignored);
 }
-
 double getTimeDelta(SystemTime start)
 {
-	timespec t;
-	CompilerMemBar();
-	if ((start.tv_sec == (time_t)-1 && start.tv_nsec == -1) || clock_gettime(CLOCK_MONOTONIC_RAW, &t) != 0) {
-		return -1;
-	}
-	CompilerMemBar();
-
-	return static_cast<double>(static_cast<long>(t.tv_sec) - static_cast<long>(start.tv_sec)) * 1000 + double(t.tv_nsec - start.tv_nsec) / 1000000;
+    return static_cast<double>(getSystemTime() - start);
 }
 
 }  // end namespace moodycamel

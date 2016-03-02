@@ -18,16 +18,16 @@ namespace moodycamel { typedef unsigned long long SystemTime; }
 #include <cstdint>
 namespace moodycamel { typedef std::uint64_t SystemTime; }
 #elif defined(ST_NIX)
+#include <cstdint>
 #include <time.h>
-namespace moodycamel { typedef timespec SystemTime; }
+#include <x86intrin.h>
+namespace moodycamel { typedef std::uint64_t SystemTime; }
+//namespace moodycamel { typedef timespec SystemTime; }
 #endif
 
 namespace moodycamel
 {
-void sleep(int milliseconds);
-
-SystemTime getSystemTime();
-
-// Returns the delta time, in milliseconds
-double getTimeDelta(SystemTime start);
+    void sleep(int milliseconds);
+    SystemTime getSystemTime();
+    double getTimeDelta(SystemTime start);
 }
