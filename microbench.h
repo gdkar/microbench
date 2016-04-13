@@ -79,7 +79,7 @@ namespace moodycamel
 		inline double q(std::size_t which) const { assert(which < 4 && which > 0); return _q[which - 1]; }
 	    friend std::ostream	&operator << (std::ostream & os, const stats_t &st)
         {
-            os << "min:\t" << st.min() << "\tavg:\t" << st.avg() << "\tmax:\t" << st.max();
+            os << "min:\t" << st.min() << "\tmean:\t" << st.avg() << "\tmedian:\t" << st.median() << "\tmax:\t" << st.max();
             os << "\tstddev:\t" << st.stddev();
             return os;
         }
@@ -102,14 +102,23 @@ namespace moodycamel
 		assert(iterations >= 1);
         auto results = std::make_unique<double[]>(testRuns);
 		for (std::uint32_t i = 0; i < testRuns; ++i) {
+		    auto val = 0.0;
+		    for(std::uint32_t k = 0; k < 16; k ++) {
 			auto start = getSystemTime();
 			for (std::uint64_t j = 0; j < iterations; ++j) {
 				func();
 			}
-			results[i] = getTimeDelta(start);
-			if (returnTimePerIteration) {
-				results[i] /= iterations;
-			}
+			auto tmp = static_cast<double>(getTimeDelta(start));
+			if(val == 0)
+			    val = tmp;
+			else
+			    val = std::min(tmp,val);
+
+		    }
+		    results[i] = val;
+		    if (returnTimePerIteration) {
+			    results[i] /= iterations;
+		    }
 		}
 		return stats_t(results,testRuns);
 	}
