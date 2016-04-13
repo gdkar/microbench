@@ -2,6 +2,9 @@
 
 #include <memory>
 #include <cstdint>
+#include <iostream>
+#include <sstream>
+#include <cstdio>
 #include <cassert>
 #include <utility>
 #include <algorithm>
@@ -74,7 +77,12 @@ namespace moodycamel
 		inline double q2() const { return _q[1]; }
 		inline double q3() const { return _q[2]; }
 		inline double q(std::size_t which) const { assert(which < 4 && which > 0); return _q[which - 1]; }
-		
+	    friend std::ostream	&operator << (std::ostream & os, const stats_t &st)
+        {
+            os << "min:\t" << st.min() << "\tavg:\t" << st.avg() << "\tmax:\t" << st.max();
+            os << "\tstddev:\t" << st.stddev();
+            return os;
+        }
 	private:
 		double _min;
 		double _max;
