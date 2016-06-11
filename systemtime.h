@@ -29,5 +29,5 @@ namespace moodycamel
 {
     void sleep(int milliseconds);
     SystemTime getSystemTime();
-    double getTimeDelta(SystemTime start);
+    float getTimeDelta(SystemTime start);
 }

@@ -65,25 +65,47 @@ namespace moodycamel
 				_q[2] = results[count / 4 * 3 + 1] * 0.25 + results[count / 4 * 3 + 2] * 0.75;	
 			}
 		}
-		
-		inline double min() const { return _min; }
-		inline double max() const { return _max; }
-		inline double range() const { return _max - _min; }
-		inline double avg() const { return _avg; }
-		inline double variance() const { return _variance; }
-		inline double stddev() const { return std::sqrt(_variance); }
-		inline double median() const { return _q[1]; }
-		inline double q1() const { return _q[0]; }
-		inline double q2() const { return _q[1]; }
-		inline double q3() const { return _q[2]; }
-		inline double q(std::size_t which) const { assert(which < 4 && which > 0); return _q[which - 1]; }
+	
+		double min() const { return _min; }
+		double max() const { return _max; }
+		double range() const { return _max - _min; }
+		double avg() const { return _avg; }
+		double variance() const { return _variance; }
+		double stddev() const { return std::sqrt(_variance); }
+		double median() const { return _q[1]; }
+		double q1() const { return _q[0]; }
+		double q2() const { return _q[1]; }
+		double q3() const { return _q[2]; }
+		double q(std::size_t which) const { assert(which < 4 && which > 0); return _q[which - 1]; }
+        stats_t operator -(double x) const
+        {
+            auto ret = *this;
+            ret._min -= x;
+            ret._max -= x;
+            ret._avg -= x;
+            ret._q[0] -= x;
+            ret._q[1] -= x;
+            ret._q[2] -= x;
+            return ret;
+        }
+        stats_t operator * ( double x) const
+        {
+            auto ret = *this;
+            ret._min *= x;
+            ret._max *= x;
+            ret._avg *= x;
+            ret._variance *= (x * x);
+            ret._q[0] *= x;
+            ret._q[1] *= x;
+            ret._q[2] *= x;
+            return ret;
+        }
 	    friend std::ostream	&operator << (std::ostream & os, const stats_t &st)
         {
             os << "min:\t" << st.min() << "\tmean:\t" << st.avg() << "\tmedian:\t" << st.median() << "\tmax:\t" << st.max();
             os << "\tstddev:\t" << st.stddev();
             return os;
         }
-	private:
 		double _min;
 		double _max;
 		double _q[3];
@@ -95,8 +117,8 @@ namespace moodycamel
 	// Times how long it takes to run a given function for a given number of iterations; this
 	// timing process is repeated for a given number of test runs; various statistics of the
 	// of timing results are returned in a `stats_t` object.
-	template<typename TFunc>
-	stats_t microbench_stats(TFunc&& func, std::uint64_t iterations = 1, std::uint32_t testRuns = 100, bool returnTimePerIteration = true)
+    template<typename TFunc, std::uint64_t iterations = 1, std::uint32_t testRuns = 100>
+	stats_t microbench_stats(TFunc&& func, bool returnTimePerIteration = true)
 	{
 		assert(testRuns >= 1);
 		assert(iterations >= 1);
@@ -127,12 +149,13 @@ namespace moodycamel
 	// Times how long it takes to run a given function for a given number of iterations; this
 	// timing process is repeated for a given number of test runs; the fastest of the runs is
 	// selected, and its time returned (in milliseconds).
-	template<typename TFunc>
-	double microbench(TFunc&& func, std::uint64_t iterations = 1, std::uint32_t testRuns = 100, bool returnTimePerIteration = true)
+	template<typename TFunc, std::uint64_t iterations = 1, std::uint32_t testRuns = 100, int div = 1>
+	stats_t microbench(TFunc&& func, bool returnTimePerIteration = true)
 	{
-        auto nstats = microbench_stats([]() { },iterations,testRuns,returnTimePerIteration);
-		auto stats  = microbench_stats(std::forward<TFunc>(func), iterations, testRuns, returnTimePerIteration);
-        return stats.min() - nstats.min();
+//        auto null_lambda = [](){};
+//        auto nstats = microbench_stats<decltype(null_lambda),iterations,testRuns>(std::move(null_lambda),returnTimePerIteration);
+		auto stats  = microbench_stats<TFunc,iterations,testRuns>(std::forward<TFunc>(func),  returnTimePerIteration);
+        return (stats * (1. / div));//- nstats.min()) * (1. / div);
 	}
 }
 

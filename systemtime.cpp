@@ -2,7 +2,8 @@
 
 #include "systemtime.h"
 #include <climits>
-
+#include <thread>
+#include <mutex>
 #if defined(_MSC_VER) && _MSC_VER < 1700
 #include <intrin.h>
 #define CompilerMemBar() _ReadWriteBarrier()
@@ -33,7 +34,7 @@ SystemTime getSystemTime()
 	return static_cast<SystemTime>(t.QuadPart);
 }
 
-double getTimeDelta(SystemTime start)
+float getTimeDelta(SystemTime start)
 {
 	LARGE_INTEGER t;
 	CompilerMemBar();
@@ -49,7 +50,7 @@ double getTimeDelta(SystemTime start)
 		return -1;
 	}
 
-	return static_cast<double>(static_cast<__int64>(now - start)) / f.QuadPart * 1000;
+	return static_cast<float>(static_cast<__int64>(now - start)) / f.QuadPart * 1000;
 }
 
 }  // end namespace moodycamel
@@ -78,7 +79,7 @@ SystemTime getSystemTime()
 	return result;
 }
 
-double getTimeDelta(SystemTime start)
+float getTimeDelta(SystemTime start)
 {
 	CompilerMemBar();
 	std::uint64_t end = mach_absolute_time();
@@ -86,9 +87,9 @@ double getTimeDelta(SystemTime start)
 
 	mach_timebase_info_data_t tb = { 0 };
 	mach_timebase_info(&tb);
-	double toNano = static_cast<double>(tb.numer) / tb.denom;
+	auto toNano = static_cast<float>(tb.numer) / tb.denom;
 	
-	return static_cast<double>(end - start) * toNano * 0.000001;
+	return static_cast<float>(end - start) * toNano * 0.000001;
 }
 
 }  // end namespace moodycamel
@@ -101,14 +102,31 @@ void sleep(int milliseconds)
 {
 	::usleep(milliseconds * 1000);
 }
+auto factor = 1.0f;
+std::once_flag factor_callibrate_once{};
 SystemTime getSystemTime()
 {
     uint32_t ignored;
     return __rdtscp(&ignored);
 }
-double getTimeDelta(SystemTime start)
+void initSystemTime(void)
 {
-    return static_cast<double>(getSystemTime() - start);
+    auto start = getSystemTime();
+    auto usec = 10000;
+    ::usleep(usec);
+    auto took  = getSystemTime() - start;
+    factor = usec * 1e3 / took;
+}
+struct once_callibration {
+    once_callibration(int)
+    {
+        std::call_once(factor_callibrate_once, initSystemTime);
+    }
+};
+once_callibration calib{0};
+float getTimeDelta(SystemTime start)
+{
+    return static_cast<float>(getSystemTime() - start) * factor;
 }
 
 }  // end namespace moodycamel
