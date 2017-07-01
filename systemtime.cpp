@@ -2,6 +2,12 @@
 
 #include "systemtime.h"
 #include <climits>
+#include <limits>
+#include <iostream>
+#include <cstdio>
+#include <cmath>
+#include <algorithm>
+#include <numeric>
 #include <thread>
 #include <mutex>
 #if defined(_MSC_VER) && _MSC_VER < 1700
@@ -34,7 +40,7 @@ SystemTime getSystemTime()
 	return static_cast<SystemTime>(t.QuadPart);
 }
 
-float getTimeDelta(SystemTime start)
+double getTimeDelta(SystemTime start)
 {
 	LARGE_INTEGER t;
 	CompilerMemBar();
@@ -50,7 +56,7 @@ float getTimeDelta(SystemTime start)
 		return -1;
 	}
 
-	return static_cast<float>(static_cast<__int64>(now - start)) / f.QuadPart * 1000;
+	return static_cast<double>(static_cast<__int64>(now - start)) / f.QuadPart * 1000;
 }
 
 }  // end namespace moodycamel
@@ -79,7 +85,7 @@ SystemTime getSystemTime()
 	return result;
 }
 
-float getTimeDelta(SystemTime start)
+double getTimeDelta(SystemTime start)
 {
 	CompilerMemBar();
 	std::uint64_t end = mach_absolute_time();
@@ -87,9 +93,9 @@ float getTimeDelta(SystemTime start)
 
 	mach_timebase_info_data_t tb = { 0 };
 	mach_timebase_info(&tb);
-	auto toNano = static_cast<float>(tb.numer) / tb.denom;
+	auto toNano = static_cast<double>(tb.numer) / tb.denom;
 	
-	return static_cast<float>(end - start) * toNano * 0.000001;
+	return static_cast<double>(end - start) * toNano * 0.000001;
 }
 
 }  // end namespace moodycamel
@@ -98,11 +104,19 @@ float getTimeDelta(SystemTime start)
 #include <unistd.h>
 namespace moodycamel
 {
+auto factor = 0.0f;
 void sleep(int milliseconds)
 {
-	::usleep(milliseconds * 1000);
+    auto start = getSystemTime();
+    auto usec = milliseconds * 1000;
+    ::usleep(usec);
+    auto took  = getSystemTime() - start;
+    auto new_factor = usec * 1e3 / took;
+    if(factor && std::abs((new_factor - factor)/(0.5 * (new_factor + factor))) > 5e-2) {
+        std::cerr << "WARNING: estimated clock rate change by more than 5 percent.";
+    }
+    factor = (!factor) ? new_factor : (new_factor + factor) * 0.5;
 }
-auto factor = 1.0f;
 std::once_flag factor_callibrate_once{};
 SystemTime getSystemTime()
 {
@@ -111,11 +125,7 @@ SystemTime getSystemTime()
 }
 void initSystemTime(void)
 {
-    auto start = getSystemTime();
-    auto usec = 10000;
-    ::usleep(usec);
-    auto took  = getSystemTime() - start;
-    factor = usec * 1e3 / took;
+    sleep(20);
 }
 struct once_callibration {
     once_callibration(int)
@@ -123,10 +133,17 @@ struct once_callibration {
         std::call_once(factor_callibrate_once, initSystemTime);
     }
 };
-once_callibration calib{0};
-float getTimeDelta(SystemTime start)
+double getFactor()
 {
-    return static_cast<float>(getSystemTime() - start) * factor;
+    if(!factor){
+        initSystemTime();
+    }
+    return factor;
+}
+once_callibration calib{0};
+double getTimeDelta(SystemTime start)
+{
+    return static_cast<double>(getSystemTime() - start) * factor;
 }
 
 }  // end namespace moodycamel
